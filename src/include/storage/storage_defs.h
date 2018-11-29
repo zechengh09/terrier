@@ -10,7 +10,8 @@
 #include "common/container/bitmap.h"
 #include "common/macros.h"
 #include "common/object_pool.h"
-#include "common/typedefs.h"
+#include "common/strong_typedef.h"
+#include "storage/block_access_controller.h"
 
 namespace terrier::storage {
 // Write Ahead Logging:
@@ -18,11 +19,19 @@ namespace terrier::storage {
 
 // All tuples potentially visible to txns should have a non-null attribute of version vector.
 // This is not to be confused with a non-null version vector that has value nullptr (0).
-#define VERSION_POINTER_COLUMN_ID col_id_t(0)
+#define VERSION_POINTER_COLUMN_ID ::terrier::storage::col_id_t(0)
 #define NUM_RESERVED_COLUMNS 1u
+
+// Use byte for raw byte storage instead of char so string functions are explicitly disabled for those.
+using byte = std::byte;
+STRONG_TYPEDEF(col_id_t, uint16_t);
+STRONG_TYPEDEF(layout_version_t, uint32_t);
+
 /**
  * A block is a chunk of memory used for storage. It does not have any meaning
  * unless interpreted by a @see TupleAccessStrategy
+ *
+ * @warning If you change this please also change the way header sizes are computed in block layout!
  */
 struct alignas(common::Constants::BLOCK_SIZE) RawBlock {
   /**
@@ -32,11 +41,15 @@ struct alignas(common::Constants::BLOCK_SIZE) RawBlock {
   /**
    * Number of records.
    */
-  std::atomic<uint32_t> num_records_;
+  std::atomic<uint32_t> insert_head_;
+  /**
+   * Access controller of this block
+   */
+  BlockAccessController controller_;
   /**
    * Contents of the raw block.
    */
-  byte content_[common::Constants::BLOCK_SIZE - 2 * sizeof(uint32_t)];
+  byte content_[common::Constants::BLOCK_SIZE - 2 * sizeof(uint32_t) - sizeof(BlockAccessController)];
   // A Block needs to always be aligned to 1 MB, so we can get free bytes to
   // store offsets within a block in ine 8-byte word.
 };

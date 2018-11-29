@@ -2,6 +2,7 @@
 
 #include <queue>
 #include <utility>
+#include "storage/access_observer.h"
 #include "transaction/transaction_context.h"
 #include "transaction/transaction_defs.h"
 #include "transaction/transaction_manager.h"
@@ -21,8 +22,9 @@ class GarbageCollector {
    * GC to invoke the TM's function for handing off the completed transactions queue.
    * @param txn_manager pointer to the TransactionManager
    */
-  explicit GarbageCollector(transaction::TransactionManager *txn_manager)
-      : txn_manager_(txn_manager), last_unlinked_{0} {
+  // TODO(Tianyu): Remove nullptr default argument
+  explicit GarbageCollector(transaction::TransactionManager *txn_manager, AccessObserver *observer = nullptr)
+      : txn_manager_(txn_manager), last_unlinked_{0}, observer_(observer) {
     TERRIER_ASSERT(txn_manager_->GCEnabled(),
                    "The TransactionManager needs to be instantiated with gc_enabled true for GC to work!");
   }
@@ -51,6 +53,10 @@ class GarbageCollector {
    */
   uint32_t ProcessUnlinkQueue();
 
+  bool ProcessUndoRecord(transaction::TransactionContext *txn, UndoRecord *undo_record) const;
+
+  void ReclaimSlotIfDeleted(UndoRecord *undo_record) const;
+
   /**
    * Given a UndoRecord that has been deemed safe to unlink by the GC, attempts to remove it from the version chain.
    * It's possible that this process will fail because the GC is conservative with conflicts. If the UndoRecord in the
@@ -65,11 +71,12 @@ class GarbageCollector {
 
   transaction::TransactionManager *const txn_manager_;
   // timestamp of the last time GC unlinked anything. We need this to know when unlinked versions are safe to deallocate
-  timestamp_t last_unlinked_;
+  transaction::timestamp_t last_unlinked_;
   // queue of txns that have been unlinked, and should possible be deleted on next GC run
   transaction::TransactionQueue txns_to_deallocate_;
   // queue of txns that need to be unlinked
   transaction::TransactionQueue txns_to_unlink_;
+  AccessObserver *observer_;
 };
 
 }  // namespace terrier::storage

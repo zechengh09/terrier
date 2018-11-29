@@ -38,10 +38,11 @@ void DataTable::Scan(transaction::TransactionContext *const txn, SlotIterator *c
   out_buffer->SetNumTuples(filled);
 }
 
-bool DataTable::Update(transaction::TransactionContext *const txn, const TupleSlot slot, const ProjectedRow &redo) {
+bool DataTable::Update(transaction::TransactionContext *txn, TupleSlot slot, const ProjectedRow &redo) {
   TERRIER_ASSERT(redo.NumColumns() <= accessor_.GetBlockLayout().NumColumns() - NUM_RESERVED_COLUMNS,
                  "The input buffer cannot change the reserved columns, so it should have fewer attributes.");
   TERRIER_ASSERT(redo.NumColumns() > 0, "The input buffer should modify at least one attribute.");
+  slot.GetBlock()->controller_.WaitUntilHot();
   UndoRecord *const undo = txn->UndoRecordForUpdate(this, slot, redo);
   UndoRecord *const version_ptr = AtomicallyReadVersionPtr(slot, accessor_);
 
@@ -85,7 +86,7 @@ TupleSlot DataTable::Insert(transaction::TransactionContext *const txn, const Pr
   TERRIER_ASSERT(redo.NumColumns() == accessor_.GetBlockLayout().NumColumns() - NUM_RESERVED_COLUMNS,
                  "The input buffer never changes the version pointer column, so it should have  exactly 1 fewer "
                  "attribute than the DataTable's layout.");
-
+  // TODO(Tianyu): Should we assume that we are inserting into a hot block by default?
   // Attempt to allocate a new tuple from the block we are working on right now.
   // If that block is full, try to request a new block. Because other concurrent
   // inserts could have already created a new block, we need to use compare and swap
@@ -97,29 +98,35 @@ TupleSlot DataTable::Insert(transaction::TransactionContext *const txn, const Pr
     if (block != nullptr && accessor_.Allocate(block, &result)) break;
     NewBlock(block);
   }
-  // At this point, sequential scan down the block can still see this, except it thinks it is logically deleted if we 0
-  // the primary key column
-  UndoRecord *undo = txn->UndoRecordForInsert(this, result);
-
-  // Update the version pointer atomically so that a sequential scan will not see inconsistent version pointer, which
-  // may result in a segfault
-  AtomicallyWriteVersionPtr(result, accessor_, undo);
-
-  // Set the logically deleted bit to present as the undo record is ready
-  accessor_.AccessForceNotNull(result, VERSION_POINTER_COLUMN_ID);
-
-  // Update in place with the new value.
-  for (uint16_t i = 0; i < redo.NumColumns(); i++) {
-    TERRIER_ASSERT(redo.ColumnIds()[i] != VERSION_POINTER_COLUMN_ID,
-                   "Insert buffer should not change the version pointer column.");
-    StorageUtil::CopyAttrFromProjection(accessor_, result, redo, i);
-  }
-
+  InsertInto(txn, redo, result);
+  // TODO(Tianyu): Encapsulate this better
+  // Mark that the insert is done, so the compaction thread.
+  result.GetBlock()->insert_head_++;
   data_table_counter_.IncrementNumInsert(1);
   return result;
 }
 
+void DataTable::InsertInto(transaction::TransactionContext *txn, const ProjectedRow &redo, TupleSlot dest) {
+  TERRIER_ASSERT(accessor_.Allocated(dest), "destination slot must already be allocated");
+  TERRIER_ASSERT(
+      accessor_.IsNull(dest, VERSION_POINTER_COLUMN_ID) && AtomicallyReadVersionPtr(dest, accessor_) == nullptr,
+      "The slot needs to be logically deleted to every running transaction");
+  // At this point, sequential scan down the block can still see this, except it thinks it is logically deleted if we 0
+  // the primary key column
+  UndoRecord *undo = txn->UndoRecordForInsert(this, dest);
+  AtomicallyWriteVersionPtr(dest, accessor_, undo);
+  // Set the logically deleted bit to present as the undo record is ready
+  accessor_.AccessForceNotNull(dest, VERSION_POINTER_COLUMN_ID);
+  // Update in place with the new value.
+  for (uint16_t i = 0; i < redo.NumColumns(); i++) {
+    TERRIER_ASSERT(redo.ColumnIds()[i] != VERSION_POINTER_COLUMN_ID,
+                   "Insert buffer should not change the version pointer column.");
+    StorageUtil::CopyAttrFromProjection(accessor_, dest, redo, i);
+  }
+}
+
 bool DataTable::Delete(transaction::TransactionContext *const txn, const TupleSlot slot) {
+  slot.GetBlock()->controller_.WaitUntilHot();
   data_table_counter_.IncrementNumDelete(1);
   // Create a redo
   txn->StageDelete(this, slot);
@@ -235,9 +242,9 @@ bool DataTable::Visible(const TupleSlot slot, const TupleAccessStrategy &accesso
 
 bool DataTable::HasConflict(UndoRecord *const version_ptr, const transaction::TransactionContext *const txn) const {
   if (version_ptr == nullptr) return false;  // Nobody owns this tuple's write lock, no older version visible
-  const timestamp_t version_timestamp = version_ptr->Timestamp().load();
-  const timestamp_t txn_id = txn->TxnId().load();
-  const timestamp_t start_time = txn->StartTime();
+  const transaction::timestamp_t version_timestamp = version_ptr->Timestamp().load();
+  const transaction::timestamp_t txn_id = txn->TxnId().load();
+  const transaction::timestamp_t start_time = txn->StartTime();
   const bool owned_by_other_txn =
       (!transaction::TransactionUtil::Committed(version_timestamp) && version_timestamp != txn_id);
   const bool newer_committed_version = transaction::TransactionUtil::Committed(version_timestamp) &&

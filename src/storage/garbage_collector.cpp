@@ -12,6 +12,7 @@
 namespace terrier::storage {
 
 std::pair<uint32_t, uint32_t> GarbageCollector::PerformGarbageCollection() {
+  if (observer_ != nullptr) observer_->ObserveGCInvocation();
   uint32_t txns_deallocated = ProcessDeallocateQueue();
   STORAGE_LOG_TRACE("GarbageCollector::PerformGarbageCollection(): txns_deallocated: {}", txns_deallocated);
   uint32_t txns_unlinked = ProcessUnlinkQueue();
@@ -27,7 +28,7 @@ std::pair<uint32_t, uint32_t> GarbageCollector::PerformGarbageCollection() {
 }
 
 uint32_t GarbageCollector::ProcessDeallocateQueue() {
-  const timestamp_t oldest_txn = txn_manager_->OldestTransactionStartTime();
+  const transaction::timestamp_t oldest_txn = txn_manager_->OldestTransactionStartTime();
   uint32_t txns_processed = 0;
   transaction::TransactionContext *txn = nullptr;
 
@@ -46,7 +47,7 @@ uint32_t GarbageCollector::ProcessDeallocateQueue() {
 }
 
 uint32_t GarbageCollector::ProcessUnlinkQueue() {
-  const timestamp_t oldest_txn = txn_manager_->OldestTransactionStartTime();
+  const transaction::timestamp_t oldest_txn = txn_manager_->OldestTransactionStartTime();
   transaction::TransactionContext *txn = nullptr;
 
   // Get the completed transactions from the TransactionManager
@@ -77,7 +78,7 @@ uint32_t GarbageCollector::ProcessUnlinkQueue() {
 
       bool all_unlinked = true;
       for (auto &undo_record : txn->undo_buffer_) {
-        all_unlinked = all_unlinked && UnlinkUndoRecord(txn, &undo_record);
+        all_unlinked = all_unlinked && ProcessUndoRecord(txn, &undo_record);
       }
       if (all_unlinked) {
         // We unlinked all of the UndoRecords for this txn, so we can add it to the deallocation queue
@@ -103,6 +104,21 @@ uint32_t GarbageCollector::ProcessUnlinkQueue() {
   return txns_processed;
 }
 
+bool GarbageCollector::ProcessUndoRecord(transaction::TransactionContext *const txn,
+                                         UndoRecord *const undo_record) const {
+  DataTable *&table = undo_record->Table();
+  // if this UndoRecord has already been processed, we can skip it
+  if (table == nullptr) return true;
+  // no point in trying to reclaim slots or do any further operation if cannot safely unlink
+  if (!UnlinkUndoRecord(txn, undo_record)) return false;
+  // TODO(Tianyu): Potentially this will get the access information to the observer late, but that
+  // should be fine since the transformation is transactional and light-weight.
+  if (observer_ != nullptr) observer_->ObserveWrite(table, undo_record->Slot());
+  // mark the record as fully processed
+  table = nullptr;
+  return true;
+}
+
 bool GarbageCollector::UnlinkUndoRecord(transaction::TransactionContext *const txn,
                                         UndoRecord *const undo_record) const {
   TERRIER_ASSERT(txn->TxnId().load() == undo_record->Timestamp().load(),
@@ -121,11 +137,7 @@ bool GarbageCollector::UnlinkUndoRecord(transaction::TransactionContext *const t
 
   if (version_ptr->Timestamp().load() == txn->TxnId().load()) {
     // Our UndoRecord is the first in the chain, handle contention on the write lock with CAS
-    if (table->CompareAndSwapVersionPtr(slot, accessor, version_ptr, version_ptr->Next())) {
-      // Mark this UndoRecord as unlinked from the version chain by setting the table pointer to nullptr.
-      undo_record->Table() = nullptr;
-      return true;
-    }
+    if (table->CompareAndSwapVersionPtr(slot, accessor, version_ptr, version_ptr->Next())) return true;
     // Someone swooped the VersionPointer while we were trying to swap it (aka took the write lock)
     version_ptr = table->AtomicallyReadVersionPtr(slot, accessor);
   }
@@ -147,8 +159,6 @@ bool GarbageCollector::UnlinkUndoRecord(transaction::TransactionContext *const t
   if (transaction::TransactionUtil::Committed(curr->Timestamp().load())) {
     // Update the next pointer to unlink the UndoRecord
     curr->Next().store(next->Next().load());
-    // Mark this UndoRecord as unlinked from the version chain by setting the table pointer to nullptr.
-    undo_record->Table() = nullptr;
     return true;
   }
 
@@ -156,5 +166,4 @@ bool GarbageCollector::UnlinkUndoRecord(transaction::TransactionContext *const t
   // target UndoRecord not yet being committed)
   return false;
 }
-
 }  // namespace terrier::storage
