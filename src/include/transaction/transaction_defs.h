@@ -4,7 +4,7 @@
 #include "common/strong_typedef.h"
 namespace terrier::transaction {
 STRONG_TYPEDEF(timestamp_t, uint64_t);
-
+STRONG_TYPEDEF(worker_id_t, uint32_t);
 class TransactionContext;
 // Explicitly define the underlying structure of std::queue as std::list since we believe the default (std::deque) may
 // be too memory inefficient and we don't need the fast random access that it provides. It's also impossible to call
