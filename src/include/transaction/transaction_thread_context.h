@@ -18,13 +18,11 @@ class TransactionThreadContext {
   /**
    * @return worker id of the thread
    */
-  worker_id_t GetWorkerId() const {
-    return worker_id_;
-  }
+  worker_id_t GetWorkerId() const { return worker_id_; }
+
  private:
   // id of the worker thread on which the transaction start and finish.
   worker_id_t worker_id_;
   // TODO(Tianyu): Add cached pointer to thread-local latch here
-
 };
-} // namespace terrier::transaction
+}  // namespace terrier::transaction

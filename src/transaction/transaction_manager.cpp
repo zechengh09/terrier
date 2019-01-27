@@ -15,11 +15,8 @@ TransactionContext *TransactionManager::BeginTransaction(TransactionThreadContex
   // Doing this with std::map or other data structure is risky though, as they may not
   // guarantee that the iterator or underlying pointer is stable across operations.
   // (That is, they may change as concurrent inserts and deletes happen)
-  auto *const result = new TransactionContext(start_time,
-                                              start_time + INT64_MIN,
-                                              buffer_pool_,
-                                              log_manager_,
-                                              thread_context);
+  auto *const result =
+      new TransactionContext(start_time, start_time + INT64_MIN, buffer_pool_, log_manager_, thread_context);
   common::SpinLatch::ScopedSpinLatch running_guard(&curr_running_txns_latch_);
   const auto ret UNUSED_ATTRIBUTE = curr_running_txns_.emplace(result->StartTime());
   TERRIER_ASSERT(ret.second, "commit start time should be globally unique");
@@ -201,9 +198,11 @@ void TransactionManager::Rollback(TransactionContext *txn, const storage::UndoRe
       accessor.SetNull(slot, VERSION_POINTER_COLUMN_ID);
       accessor.Deallocate(slot);
       break;
-    case storage::DeltaRecordType::DELETE:accessor.SetNotNull(slot, VERSION_POINTER_COLUMN_ID);
+    case storage::DeltaRecordType::DELETE:
+      accessor.SetNotNull(slot, VERSION_POINTER_COLUMN_ID);
       break;
-    default:throw std::runtime_error("unexpected delta record type");
+    default:
+      throw std::runtime_error("unexpected delta record type");
   }
   // Remove this delta record from the version chain, effectively releasing the lock. At this point, the tuple
   // has been restored to its original form. No CAS needed since we still hold the write lock at time of the atomic

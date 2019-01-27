@@ -42,8 +42,10 @@ class RandomWorkloadTransaction {
   /**
    * Initializes a new RandomWorkloadTransaction to work on the given test object
    * @param test_object the test object that runs this transaction
+   * @param thread_context Context of the thread on which the transaction begins and ends
    */
-  explicit RandomWorkloadTransaction(LargeTransactionTestObject *test_object);
+  RandomWorkloadTransaction(LargeTransactionTestObject *test_object,
+                            transaction::TransactionThreadContext *thread_context);
 
   /**
    * Destructs a random workload transaction

@@ -8,8 +8,8 @@
 #include "storage/tuple_access_strategy.h"
 #include "storage/undo_record.h"
 #include "storage/write_ahead_log/log_record.h"
-#include "transaction/transaction_util.h"
 #include "transaction/transaction_thread_context.h"
+#include "transaction/transaction_util.h"
 
 namespace terrier::storage {
 class GarbageCollector;
@@ -33,14 +33,13 @@ class TransactionContext {
    * @param thread_
    */
   TransactionContext(const timestamp_t start, const timestamp_t txn_id,
-                     storage::RecordBufferSegmentPool *const buffer_pool,
-                     storage::LogManager *const log_manager,
+                     storage::RecordBufferSegmentPool *const buffer_pool, storage::LogManager *const log_manager,
                      TransactionThreadContext *worker_thread = nullptr)
       : start_time_(start),
         txn_id_(txn_id),
         undo_buffer_(buffer_pool),
         redo_buffer_(log_manager, buffer_pool),
-        worker_thread_ (worker_thread) {}
+        worker_thread_(worker_thread) {}
 
   ~TransactionContext() {
     for (const byte *ptr : loose_ptrs_) delete[] ptr;
