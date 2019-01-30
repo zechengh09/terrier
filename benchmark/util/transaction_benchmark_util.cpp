@@ -7,9 +7,10 @@
 #include "transaction/transaction_util.h"
 
 namespace terrier {
-RandomWorkloadTransaction::RandomWorkloadTransaction(LargeTransactionBenchmarkObject *test_object)
+RandomWorkloadTransaction::RandomWorkloadTransaction(LargeTransactionBenchmarkObject *test_object,
+                                                     transaction::TransactionThreadContext *thread_context)
     : test_object_(test_object),
-      txn_(test_object->txn_manager_.BeginTransaction()),
+      txn_(test_object->txn_manager_.BeginTransaction(thread_context)),
       aborted_(false),
       start_time_(txn_->StartTime()),
       commit_time_(UINT64_MAX),
@@ -102,15 +103,19 @@ LargeTransactionBenchmarkObject::~LargeTransactionBenchmarkObject() {
 
 // Caller is responsible for freeing the returned results if bookkeeping is on.
 uint64_t LargeTransactionBenchmarkObject::SimulateOltp(uint32_t num_transactions, uint32_t num_concurrent_txns) {
+  std::vector<transaction::TransactionThreadContext *> thread_contexts;
+  for (uint32_t i = 0; i < num_concurrent_txns; i++)
+    thread_contexts.push_back(txn_manager_.RegisterWorker(transaction::worker_id_t(i)));
+
   common::WorkerPool thread_pool(num_concurrent_txns, {});
   std::vector<RandomWorkloadTransaction *> txns;
   std::function<void(uint32_t)> workload;
   std::atomic<uint32_t> txns_run = 0;
   if (gc_on_) {
     // Then there is no need to keep track of RandomWorkloadTransaction objects
-    workload = [&](uint32_t) {
+    workload = [&](uint32_t id) {
       for (uint32_t txn_id = txns_run++; txn_id < num_transactions; txn_id = txns_run++) {
-        RandomWorkloadTransaction txn(this);
+        RandomWorkloadTransaction txn(this, thread_contexts[id]);
         SimulateOneTransaction(&txn, txn_id);
       }
     };
@@ -118,9 +123,9 @@ uint64_t LargeTransactionBenchmarkObject::SimulateOltp(uint32_t num_transactions
     txns.resize(num_transactions);
     // Either for correctness checking, or to cleanup memory afterwards, we need to retain these
     // test objects
-    workload = [&](uint32_t) {
+    workload = [&](uint32_t id) {
       for (uint32_t txn_id = txns_run++; txn_id < num_transactions; txn_id = txns_run++) {
-        txns[txn_id] = new RandomWorkloadTransaction(this);
+        txns[txn_id] = new RandomWorkloadTransaction(this, thread_contexts[id]);
         SimulateOneTransaction(txns[txn_id], txn_id);
       }
     };
@@ -133,6 +138,9 @@ uint64_t LargeTransactionBenchmarkObject::SimulateOltp(uint32_t num_transactions
     if (txn->aborted_) abort_count_++;
     delete txn;
   }
+
+  for (auto *thread_context : thread_contexts) txn_manager_.UnregisterWorker(thread_context);
+
   // This result is meaningless if bookkeeping is not turned on.
   return abort_count_;
 }
@@ -150,7 +158,8 @@ void LargeTransactionBenchmarkObject::SimulateOneTransaction(terrier::RandomWork
 
 template <class Random>
 void LargeTransactionBenchmarkObject::PopulateInitialTable(uint32_t num_tuples, Random *generator) {
-  initial_txn_ = txn_manager_.BeginTransaction();
+  transaction::TransactionThreadContext *thread_context = txn_manager_.RegisterWorker(transaction::worker_id_t(0));
+  initial_txn_ = txn_manager_.BeginTransaction(thread_context);
   byte *redo_buffer = nullptr;
 
   redo_buffer = common::AllocationUtil::AllocateAligned(row_initializer_.ProjectedRowSize());
@@ -170,5 +179,6 @@ void LargeTransactionBenchmarkObject::PopulateInitialTable(uint32_t num_tuples, 
   txn_manager_.Commit(initial_txn_, TestCallbacks::EmptyCallback, nullptr);
   // cleanup if not keeping track of all the inserts.
   delete[] redo_buffer;
+  txn_manager_.UnregisterWorker(thread_context);
 }
 }  // namespace terrier

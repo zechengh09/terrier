@@ -8,6 +8,7 @@
 #include "storage/tuple_access_strategy.h"
 #include "storage/undo_record.h"
 #include "storage/write_ahead_log/log_record.h"
+#include "transaction/transaction_thread_context.h"
 #include "transaction/transaction_util.h"
 
 namespace terrier::storage {
@@ -29,10 +30,16 @@ class TransactionContext {
    * @param txn_id the id of the transaction, should be larger than all start time and commit time
    * @param buffer_pool the buffer pool to draw this transaction's undo buffer from
    * @param log_manager pointer to log manager in the system, or nullptr, if logging is disabled
+   * @param thread_
    */
   TransactionContext(const timestamp_t start, const timestamp_t txn_id,
-                     storage::RecordBufferSegmentPool *const buffer_pool, storage::LogManager *const log_manager)
-      : start_time_(start), txn_id_(txn_id), undo_buffer_(buffer_pool), redo_buffer_(log_manager, buffer_pool) {}
+                     storage::RecordBufferSegmentPool *const buffer_pool, storage::LogManager *const log_manager,
+                     TransactionThreadContext *worker_thread = nullptr)
+      : start_time_(start),
+        txn_id_(txn_id),
+        undo_buffer_(buffer_pool),
+        redo_buffer_(log_manager, buffer_pool),
+        worker_thread_(worker_thread) {}
 
   ~TransactionContext() {
     for (const byte *ptr : loose_ptrs_) delete[] ptr;
@@ -129,5 +136,8 @@ class TransactionContext {
   // log manager will set this to be true when log records are processed (not necessarily flushed, but will not be read
   // again in the future), so it can be garbage-collected safely.
   bool log_processed_ = false;
+  // A transaction always enters and leaves the system on the same thread, namely the thread dispatched to handle the
+  // client connection. Some localized information can be stored about the thread in order to enable optimization.
+  TransactionThreadContext *worker_thread_;
 };
 }  // namespace terrier::transaction
