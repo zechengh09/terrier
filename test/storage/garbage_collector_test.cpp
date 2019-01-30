@@ -93,7 +93,8 @@ TEST_F(GarbageCollectorTests, SingleInsert) {
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
     storage::TupleSlot slot = tested.table_.Insert(txn0, *insert_tuple);
@@ -110,6 +111,8 @@ TEST_F(GarbageCollectorTests, SingleInsert) {
     // Unlink the Insert's UndoRecord, then deallocate it on the next run
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     EXPECT_EQ(std::make_pair(1u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -120,13 +123,16 @@ TEST_F(GarbageCollectorTests, ReadOnly) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
     txn_manager.Commit(txn0, TestCallbacks::EmptyCallback, nullptr);
 
     // Unlink the txn and deallocate immediately because it's read-only
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -138,17 +144,18 @@ TEST_F(GarbageCollectorTests, WriteWriteConflictRequeue) {
     transaction::TransactionManager txn_manager{&buffer_pool_, true, LOGGING_DISABLED};
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
 
     // insert the tuple to be Updated later
-    auto *txn = txn_manager.BeginTransaction();
+    auto *txn = txn_manager.BeginTransaction(thread_context);
     storage::TupleSlot slot = tested.table_.Insert(txn, *insert_tuple);
     txn_manager.Commit(txn, TestCallbacks::EmptyCallback, nullptr);
 
     storage::ProjectedRow *update = tested.GenerateRandomUpdate(&generator_);
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
     EXPECT_TRUE(tested.table_.Update(txn0, slot, *update));
 
@@ -168,6 +175,8 @@ TEST_F(GarbageCollectorTests, WriteWriteConflictRequeue) {
     EXPECT_EQ(std::make_pair(0u, 2u), gc.PerformGarbageCollection());
     // Safe to deallocate both transactions
     EXPECT_EQ(std::make_pair(2u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -178,8 +187,9 @@ TEST_F(GarbageCollectorTests, CommitInsert1) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
     storage::TupleSlot slot = tested.table_.Insert(txn0, *insert_tuple);
@@ -191,7 +201,7 @@ TEST_F(GarbageCollectorTests, CommitInsert1) {
     // Nothing should be able to be GC'd yet because txn0 has not committed yet
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn1 = txn_manager.BeginTransaction();
+    auto *txn1 = txn_manager.BeginTransaction(thread_context);
 
     tested.SelectIntoBuffer(txn1, slot);
     EXPECT_FALSE(tested.select_result_);
@@ -210,7 +220,7 @@ TEST_F(GarbageCollectorTests, CommitInsert1) {
     EXPECT_EQ(std::make_pair(0u, 2u), gc.PerformGarbageCollection());
     EXPECT_EQ(std::make_pair(1u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn2 = txn_manager.BeginTransaction();
+    auto *txn2 = txn_manager.BeginTransaction(thread_context);
 
     select_tuple = tested.SelectIntoBuffer(txn2, slot);
     EXPECT_TRUE(tested.select_result_);
@@ -220,6 +230,8 @@ TEST_F(GarbageCollectorTests, CommitInsert1) {
     // Unlink the read-only transaction, and it shouldn't make it to the second invocation because it's read-only
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -230,10 +242,11 @@ TEST_F(GarbageCollectorTests, CommitInsert2) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
-    auto *txn1 = txn_manager.BeginTransaction();
+    auto *txn1 = txn_manager.BeginTransaction(thread_context);
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
     storage::TupleSlot slot = tested.table_.Insert(txn1, *insert_tuple);
@@ -262,7 +275,7 @@ TEST_F(GarbageCollectorTests, CommitInsert2) {
     EXPECT_EQ(std::make_pair(0u, 2u), gc.PerformGarbageCollection());
     EXPECT_EQ(std::make_pair(1u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn2 = txn_manager.BeginTransaction();
+    auto *txn2 = txn_manager.BeginTransaction(thread_context);
 
     select_tuple = tested.SelectIntoBuffer(txn2, slot);
     EXPECT_TRUE(tested.select_result_);
@@ -273,6 +286,8 @@ TEST_F(GarbageCollectorTests, CommitInsert2) {
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     // It shouldn't make it to the second invocation because it's read-only
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -283,8 +298,9 @@ TEST_F(GarbageCollectorTests, AbortInsert1) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
     storage::TupleSlot slot = tested.table_.Insert(txn0, *insert_tuple);
@@ -296,7 +312,7 @@ TEST_F(GarbageCollectorTests, AbortInsert1) {
     // Nothing should be able to be GC'd yet because txn0 has not committed yet
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn1 = txn_manager.BeginTransaction();
+    auto *txn1 = txn_manager.BeginTransaction(thread_context);
 
     tested.SelectIntoBuffer(txn1, slot);
     EXPECT_FALSE(tested.select_result_);
@@ -318,7 +334,7 @@ TEST_F(GarbageCollectorTests, AbortInsert1) {
     // Read-only transaction shouldn't have made it to the deallocate queue
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn2 = txn_manager.BeginTransaction();
+    auto *txn2 = txn_manager.BeginTransaction(thread_context);
 
     tested.SelectIntoBuffer(txn2, slot);
     EXPECT_FALSE(tested.select_result_);
@@ -328,6 +344,8 @@ TEST_F(GarbageCollectorTests, AbortInsert1) {
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     // It shouldn't make it to the second invocation because it's read-only
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -338,10 +356,11 @@ TEST_F(GarbageCollectorTests, AbortInsert2) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
-    auto *txn1 = txn_manager.BeginTransaction();
+    auto *txn1 = txn_manager.BeginTransaction(thread_context);
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
     storage::TupleSlot slot = tested.table_.Insert(txn1, *insert_tuple);
@@ -373,7 +392,7 @@ TEST_F(GarbageCollectorTests, AbortInsert2) {
     // Read-only transaction shouldn't have made it to the deallocate queue
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn2 = txn_manager.BeginTransaction();
+    auto *txn2 = txn_manager.BeginTransaction(thread_context);
 
     tested.SelectIntoBuffer(txn2, slot);
     EXPECT_FALSE(tested.select_result_);
@@ -383,6 +402,8 @@ TEST_F(GarbageCollectorTests, AbortInsert2) {
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     // It shouldn't make it to the second invocation because it's read-only
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -393,11 +414,12 @@ TEST_F(GarbageCollectorTests, CommitUpdate1) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
 
     // insert the tuple to be Updated later
-    auto *txn = txn_manager.BeginTransaction();
+    auto *txn = txn_manager.BeginTransaction(thread_context);
     storage::TupleSlot slot = tested.table_.Insert(txn, *insert_tuple);
     txn_manager.Commit(txn, TestCallbacks::EmptyCallback, nullptr);
 
@@ -407,7 +429,7 @@ TEST_F(GarbageCollectorTests, CommitUpdate1) {
 
     storage::ProjectedRow *update = tested.GenerateRandomUpdate(&generator_);
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
     EXPECT_TRUE(tested.table_.Update(txn0, slot, *update));
 
@@ -420,7 +442,7 @@ TEST_F(GarbageCollectorTests, CommitUpdate1) {
     // Nothing should be able to be GC'd yet because txn0 has not committed yet
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn1 = txn_manager.BeginTransaction();
+    auto *txn1 = txn_manager.BeginTransaction(thread_context);
 
     select_tuple = tested.SelectIntoBuffer(txn1, slot);
     EXPECT_TRUE(tested.select_result_);
@@ -442,7 +464,7 @@ TEST_F(GarbageCollectorTests, CommitUpdate1) {
     // Read-only transaction shouldn't have made it to the deallocate queue
     EXPECT_EQ(std::make_pair(1u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn2 = txn_manager.BeginTransaction();
+    auto *txn2 = txn_manager.BeginTransaction(thread_context);
 
     select_tuple = tested.SelectIntoBuffer(txn2, slot);
     EXPECT_TRUE(tested.select_result_);
@@ -453,6 +475,8 @@ TEST_F(GarbageCollectorTests, CommitUpdate1) {
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     // It shouldn't make it to the second invocation because it's read-only
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -463,11 +487,12 @@ TEST_F(GarbageCollectorTests, CommitUpdate2) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
 
     // insert the tuple to be Updated later
-    auto *txn = txn_manager.BeginTransaction();
+    auto *txn = txn_manager.BeginTransaction(thread_context);
     storage::TupleSlot slot = tested.table_.Insert(txn, *insert_tuple);
     txn_manager.Commit(txn, TestCallbacks::EmptyCallback, nullptr);
 
@@ -477,9 +502,9 @@ TEST_F(GarbageCollectorTests, CommitUpdate2) {
 
     storage::ProjectedRow *update = tested.GenerateRandomUpdate(&generator_);
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
-    auto *txn1 = txn_manager.BeginTransaction();
+    auto *txn1 = txn_manager.BeginTransaction(thread_context);
 
     EXPECT_TRUE(tested.table_.Update(txn1, slot, *update));
 
@@ -512,7 +537,7 @@ TEST_F(GarbageCollectorTests, CommitUpdate2) {
     // Read-only transaction shouldn't have made it to the deallocate queue
     EXPECT_EQ(std::make_pair(1u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn2 = txn_manager.BeginTransaction();
+    auto *txn2 = txn_manager.BeginTransaction(thread_context);
 
     select_tuple = tested.SelectIntoBuffer(txn2, slot);
     EXPECT_TRUE(tested.select_result_);
@@ -523,6 +548,8 @@ TEST_F(GarbageCollectorTests, CommitUpdate2) {
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     // It shouldn't make it to the second invocation because it's read-only
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -533,11 +560,12 @@ TEST_F(GarbageCollectorTests, AbortUpdate1) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
 
     // insert the tuple to be Updated later
-    auto *txn = txn_manager.BeginTransaction();
+    auto *txn = txn_manager.BeginTransaction(thread_context);
     storage::TupleSlot slot = tested.table_.Insert(txn, *insert_tuple);
     txn_manager.Commit(txn, TestCallbacks::EmptyCallback, nullptr);
 
@@ -547,7 +575,7 @@ TEST_F(GarbageCollectorTests, AbortUpdate1) {
 
     storage::ProjectedRow *update = tested.GenerateRandomUpdate(&generator_);
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
     EXPECT_TRUE(tested.table_.Update(txn0, slot, *update));
 
@@ -557,7 +585,7 @@ TEST_F(GarbageCollectorTests, AbortUpdate1) {
     EXPECT_TRUE(tested.select_result_);
     EXPECT_TRUE(StorageTestUtil::ProjectionListEqual(tested.Layout(), select_tuple, update_tuple));
 
-    auto *txn1 = txn_manager.BeginTransaction();
+    auto *txn1 = txn_manager.BeginTransaction(thread_context);
 
     // Nothing should be able to be GC'd yet because txn0 has not committed yet
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
@@ -584,7 +612,7 @@ TEST_F(GarbageCollectorTests, AbortUpdate1) {
     // Read-only transaction shouldn't have made it to the deallocate queue
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn2 = txn_manager.BeginTransaction();
+    auto *txn2 = txn_manager.BeginTransaction(thread_context);
 
     select_tuple = tested.SelectIntoBuffer(txn2, slot);
     EXPECT_TRUE(tested.select_result_);
@@ -595,6 +623,8 @@ TEST_F(GarbageCollectorTests, AbortUpdate1) {
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     // It shouldn't make it to the second invocation because it's read-only
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -605,11 +635,12 @@ TEST_F(GarbageCollectorTests, AbortUpdate2) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
 
     // insert the tuple to be Updated later
-    auto *txn = txn_manager.BeginTransaction();
+    auto *txn = txn_manager.BeginTransaction(thread_context);
     storage::TupleSlot slot = tested.table_.Insert(txn, *insert_tuple);
     txn_manager.Commit(txn, TestCallbacks::EmptyCallback, nullptr);
 
@@ -619,9 +650,9 @@ TEST_F(GarbageCollectorTests, AbortUpdate2) {
 
     storage::ProjectedRow *update = tested.GenerateRandomUpdate(&generator_);
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
-    auto *txn1 = txn_manager.BeginTransaction();
+    auto *txn1 = txn_manager.BeginTransaction(thread_context);
 
     EXPECT_TRUE(tested.table_.Update(txn1, slot, *update));
 
@@ -656,7 +687,7 @@ TEST_F(GarbageCollectorTests, AbortUpdate2) {
     // Read-only transaction shouldn't have made it to the deallocate queue
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
 
-    auto *txn2 = txn_manager.BeginTransaction();
+    auto *txn2 = txn_manager.BeginTransaction(thread_context);
 
     select_tuple = tested.SelectIntoBuffer(txn2, slot);
     EXPECT_TRUE(tested.select_result_);
@@ -667,6 +698,8 @@ TEST_F(GarbageCollectorTests, AbortUpdate2) {
     EXPECT_EQ(std::make_pair(0u, 1u), gc.PerformGarbageCollection());
     // It shouldn't make it to the second invocation because it's read-only
     EXPECT_EQ(std::make_pair(0u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 
@@ -677,10 +710,11 @@ TEST_F(GarbageCollectorTests, InsertUpdate1) {
     transaction::TransactionManager txn_manager(&buffer_pool_, true, LOGGING_DISABLED);
     GarbageCollectorDataTableTestObject tested(&block_store_, max_columns_, &generator_);
     storage::GarbageCollector gc(&txn_manager);
+    transaction::TransactionThreadContext *thread_context = txn_manager.RegisterWorker(transaction::worker_id_t(0));
 
-    auto *txn0 = txn_manager.BeginTransaction();
+    auto *txn0 = txn_manager.BeginTransaction(thread_context);
 
-    auto *txn1 = txn_manager.BeginTransaction();
+    auto *txn1 = txn_manager.BeginTransaction(thread_context);
 
     auto *insert_tuple = tested.GenerateRandomTuple(&generator_);
     storage::TupleSlot slot = tested.table_.Insert(txn1, *insert_tuple);
@@ -708,6 +742,8 @@ TEST_F(GarbageCollectorTests, InsertUpdate1) {
     // Process the insert and aborted txns. Both should make it to the unlink phase
     EXPECT_EQ(std::make_pair(0u, 2u), gc.PerformGarbageCollection());
     EXPECT_EQ(std::make_pair(2u, 0u), gc.PerformGarbageCollection());
+
+    txn_manager.UnregisterWorker(thread_context);
   }
 }
 

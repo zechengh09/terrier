@@ -23,6 +23,5 @@ class TransactionThreadContext {
  private:
   // id of the worker thread on which the transaction start and finish.
   worker_id_t worker_id_;
-  // TODO(Tianyu): Add cached pointer to thread-local latch here
 };
 }  // namespace terrier::transaction

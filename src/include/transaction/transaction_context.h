@@ -122,6 +122,12 @@ class TransactionContext {
     storage::DeleteRecord::Initialize(redo_buffer_.NewEntry(size), start_time_, table, slot);
   }
 
+  /**
+   * Get the thread context that this txn is running on
+   * @return the pointer to the thread context
+   */
+  TransactionThreadContext *GetThreadContext() { return worker_thread_; }
+
  private:
   friend class storage::GarbageCollector;
   friend class TransactionManager;
