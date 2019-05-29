@@ -71,7 +71,14 @@ TEST(OperatorTests, LogicalInsertTest) {
                                    std::vector<catalog::col_oid_t>(columns, std::end(columns)),
                                    std::vector<std::vector<parser::AbstractExpression *>>(bad_values)),
                "Mismatched");
+  for (auto raw : bad_raw_values) {
+    delete raw;
+  }
 #endif
+
+  for (auto raw : raw_values) {
+    delete raw;
+  }
 }
 
 // NOLINTNEXTLINE
