@@ -44,6 +44,7 @@ T *TableGenerator::CreateNumberColumnData(Dist dist, uint32_t num_vals, uint64_t
 
 bool *TableGenerator::CreateBooleanColumnData(Dist dist, uint32_t num_vals) {
   auto *val = new bool[num_vals];
+  std::cout << "num_vals is " << num_vals << "\n";
 
   switch (dist) {
     case Dist::Uniform: {
@@ -77,6 +78,7 @@ std::pair<byte *, uint32_t *> TableGenerator::GenerateColumnData(const ColumnIns
   byte *col_data = nullptr;
   switch (col_meta.type_) {
     case type::TypeId::BOOLEAN: {
+      std::cout << "boolean num_rows is " << num_rows << "\n";
       col_data = reinterpret_cast<byte *>(CreateBooleanColumnData(col_meta.dist_, num_rows));
       break;
     }
@@ -115,9 +117,15 @@ std::pair<byte *, uint32_t *> TableGenerator::GenerateColumnData(const ColumnIns
   if (col_meta.nullable_) {
     std::mt19937 generator;
     std::bernoulli_distribution coin(0.1);
+    std::cout << "num_rows is " << num_rows << "\n";
     for (uint32_t i = 0; i < num_rows; i++) {
-      if (coin(generator)) util::BitUtil::Set(null_bitmap, i);
+      if (coin(generator)) {
+        util::BitUtil::Set(null_bitmap, i);
+        std::cout << "Index set is " << i << "\n";
+      }
     }
+  } else {
+    std::cout << "non_nullable \n";
   }
 
   return {col_data, null_bitmap};
