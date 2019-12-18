@@ -1,5 +1,8 @@
 #include "storage/data_table.h"
+
+#include <iostream>
 #include <list>
+
 #include "common/allocator.h"
 #include "storage/block_access_controller.h"
 #include "storage/storage_util.h"
@@ -219,6 +222,8 @@ void DataTable::InsertInto(transaction::TransactionContext *txn, const Projected
                    "Insert buffer should not change the version pointer column.");
     StorageUtil::CopyAttrFromProjection(accessor_, dest, redo, i);
   }
+
+  std::cout << "finished inserting";
 }
 
 bool DataTable::Delete(transaction::TransactionContext *const txn, const TupleSlot slot) {

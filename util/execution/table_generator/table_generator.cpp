@@ -163,6 +163,11 @@ void TableGenerator::FillTable(catalog::table_oid_t table_oid, common::ManagedPo
 
     // Insert into the table
     for (uint32_t j = 0; j < num_vals; j++) {
+      // TODO(pavlo): Remove
+      if (terrier::util::StringUtil::Contains(table_meta.name_, "all_types")) {
+        std::cout << "Reached test";
+      }
+
       auto *const redo = exec_ctx_->GetTxn()->StageWrite(exec_ctx_->DBOid(), table_oid, pri);
       for (uint16_t k = 0; k < column_data.size(); k++) {
         auto offset = offsets[k];
@@ -174,8 +179,10 @@ void TableGenerator::FillTable(catalog::table_oid_t table_oid, common::ManagedPo
           std::memcpy(data, column_data[k].first + j * elem_size, elem_size);
 
           // TODO(pavlo): Remove
-          if (terrier::util::StringUtil::Contains(table_meta.name_, "all_types") && k == 0) {
-            std::cout << "INSERT: [" << j << "] => " << static_cast<bool>(*data) << "\n";
+          std::cout << "table name is " << table_meta.name_ << "\n";
+          if (k == 0) {
+            std::cout << "Column k" << k << "\n";
+            std::cout << "INSERT: [" << j << "] => " << static_cast<uint32_t>(*(column_data[k].first + j * elem_size)) << "\n";
           }
 
         }
@@ -197,7 +204,7 @@ void TableGenerator::FillTable(catalog::table_oid_t table_oid, common::ManagedPo
       pc->SetNumTuples(common::Constants::K_DEFAULT_VECTOR_SIZE);
       auto iterator = table->begin();
       table->Scan(exec_ctx_->GetTxn(), &iterator, pc);
-      auto col0 = reinterpret_cast<bool*>(pc->ColumnStart(0));
+      auto col0 = reinterpret_cast<bool*>(pc->ColumnStart(3));
 
       // This code just scans the first column from the 'all_types' table
       // and then prints out the result. It should match "INSERT" debug
@@ -223,24 +230,24 @@ void TableGenerator::GenerateTestTables() {
    * you add a new table, set it up here.
    */
   static const std::vector<TableInsertMeta> insert_meta{
-      // The empty table
-      {"empty_table", 0, {{"colA", type::TypeId::INTEGER, false, Dist::Serial, 0, 0}}},
-
-      // Table 1
-      {"test_1",
-       TABLE_TEST1_SIZE,
-       {{"colA", type::TypeId::INTEGER, false, Dist::Serial, 0, 0},
-        {"colB", type::TypeId::INTEGER, false, Dist::Uniform, 0, 9},
-        {"colC", type::TypeId::INTEGER, false, Dist::Uniform, 0, 9999},
-        {"colD", type::TypeId::INTEGER, false, Dist::Uniform, 0, 99999}}},
-
-      // Table 2
-      {"test_2",
-       TABLE_TEST2_SIZE,
-       {{"col1", type::TypeId::SMALLINT, false, Dist::Serial, 0, 0},
-        {"col2", type::TypeId::INTEGER, true, Dist::Uniform, 0, 9},
-        {"col3", type::TypeId::BIGINT, false, Dist::Uniform, 0, common::Constants::K_DEFAULT_VECTOR_SIZE},
-        {"col4", type::TypeId::INTEGER, true, Dist::Uniform, 0, 2 * common::Constants::K_DEFAULT_VECTOR_SIZE}}},
+//      // The empty table
+//      {"empty_table", 0, {{"colA", type::TypeId::INTEGER, false, Dist::Serial, 0, 0}}},
+//
+//      // Table 1
+//      {"test_1",
+//       TABLE_TEST1_SIZE,
+//       {{"colA", type::TypeId::INTEGER, false, Dist::Serial, 0, 0},
+//        {"colB", type::TypeId::INTEGER, false, Dist::Uniform, 0, 9},
+//        {"colC", type::TypeId::INTEGER, false, Dist::Uniform, 0, 9999},
+//        {"colD", type::TypeId::INTEGER, false, Dist::Uniform, 0, 99999}}},
+//
+//      // Table 2
+//      {"test_2",
+//       TABLE_TEST2_SIZE,
+//       {{"col1", type::TypeId::SMALLINT, false, Dist::Serial, 0, 0},
+//        {"col2", type::TypeId::INTEGER, true, Dist::Uniform, 0, 9},
+//        {"col3", type::TypeId::BIGINT, false, Dist::Uniform, 0, common::Constants::K_DEFAULT_VECTOR_SIZE},
+//        {"col4", type::TypeId::INTEGER, true, Dist::Uniform, 0, 2 * common::Constants::K_DEFAULT_VECTOR_SIZE}}},
 
       // Table 3
       {"all_types",
@@ -251,11 +258,11 @@ void TableGenerator::GenerateTestTables() {
         {"int_col", type::TypeId::INTEGER, false, Dist::Uniform, 0, 1000},
         {"bigint_col", type::TypeId::BIGINT, false, Dist::Uniform, 0, 1000}}},
 
-      // Empty table with two columns
-      {"empty_table2",
-       0,
-       {{"colA", type::TypeId::INTEGER, false, Dist::Serial, 0, 0},
-        {"colB", type::TypeId::BOOLEAN, false, Dist::Uniform, 0, 0}}},
+//      // Empty table with two columns
+//      {"empty_table2",
+//       0,
+//       {{"colA", type::TypeId::INTEGER, false, Dist::Serial, 0, 0},
+//        {"colB", type::TypeId::BOOLEAN, false, Dist::Uniform, 0, 0}}},
   };
   for (const auto &table_meta : insert_meta) {
     // Create Schema.
