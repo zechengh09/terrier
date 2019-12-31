@@ -26,8 +26,11 @@ void StorageUtil::CopyWithNullCheck(const byte *const from, const TupleAccessStr
                                     const col_id_t col_id) {
   if (from == nullptr)
     accessor.SetNull(to, col_id);
-  else
-    std::memcpy(accessor.AccessForceNotNull(to, col_id), from, accessor.GetBlockLayout().AttrSize(col_id));
+  else {
+    byte* copy_loc =  accessor.AccessForceNotNull(to, col_id);
+    std::memcpy(copy_loc, from, accessor.GetBlockLayout().AttrSize(col_id));
+  }
+
 }
 
 template <class RowType>

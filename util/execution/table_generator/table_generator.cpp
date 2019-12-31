@@ -189,7 +189,7 @@ void TableGenerator::FillTable(catalog::table_oid_t table_oid, common::ManagedPo
       pc->SetNumTuples(common::Constants::K_DEFAULT_VECTOR_SIZE);
       auto iterator = table->begin();
       table->Scan(exec_ctx_->GetTxn(), &iterator, pc);
-      auto col0 = reinterpret_cast<bool*>(pc->ColumnStart(0));
+      auto col0 = reinterpret_cast<bool*>(pc->ColumnStart(offsets[0]));
 
       // This code just scans the first column from the 'all_types' table
       // and then prints out the result. It should match "INSERT" debug
