@@ -100,11 +100,13 @@ Transition PostgresProtocolInterpreter::ProcessStartup(const common::ManagedPoin
 
   if (oids.first == catalog::INVALID_DATABASE_OID) {
     // Invalid database name
+    NETWORK_LOG_ERROR("Failed to create temporary namespace. This should not happen! [database]");
     // TODO(Matt): need to actually return an error to the client
     return Transition::TERMINATE;
   }
   if (oids.second == catalog::INVALID_NAMESPACE_OID) {
     // Failed to create temporary namespace. Client should retry.
+    NETWORK_LOG_ERROR("Failed to create temporary namespace. This should not happen! [namespace]");
     // TODO(Matt): need to actually return an error to the client
     return Transition::TERMINATE;
   }

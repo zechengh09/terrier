@@ -277,7 +277,7 @@ TEST_F(NetworkTests, MultipleConnectionTest) {
  * ConnectionHandlerTask instance could corrupt its fields.
  */
 // NOLINTNEXTLINE
-TEST_F(NetworkTests, DISABLED_RacerTest) {
+TEST_F(NetworkTests, RacerTest) {
   //  due to issue #766 PostgresProtocolHandler cannot consistently handle
   //  simultaneous client requests so for now we are allowing for some failure tolerance
 
@@ -294,7 +294,7 @@ TEST_F(NetworkTests, DISABLED_RacerTest) {
   for (auto num_threads : thread_counts) {
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
-    NETWORK_LOG_INFO("Number of threads: {0}", num_threads);
+    NETWORK_LOG_DEBUG("Number of threads: {0}", num_threads);
 
     std::atomic_int successes = 0;
     for (size_t i = 0; i < num_threads; i++) {
