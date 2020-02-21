@@ -19,6 +19,9 @@ constexpr uint32_t INITIAL_BACKOFF_TIME = 2;
 constexpr uint32_t BACKOFF_FACTOR = 2;
 constexpr uint32_t MAX_BACKOFF_TIME = 500; // milliseconds
 
+constexpr uint32_t SSL_MESSAGE_VERNO = 80877103;
+#define PROTO_MAJOR_VERSION(x) ((x) >> 16)
+
 /**
  * Interprets the network protocol for postgres clients. Any state/logic that is Postgres protocol-specific should live
  * at this layer.
