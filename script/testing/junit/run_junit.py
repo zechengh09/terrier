@@ -30,6 +30,7 @@ if __name__ == "__main__":
         exit_code = junit.run()
     except:
         print("Exception trying to run junit tests")
+        print("================ Python Error Output ==================")
         traceback.print_exc(file=sys.stdout)
         exit_code = 1
 
