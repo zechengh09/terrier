@@ -130,16 +130,20 @@ public class FunctionsTest extends TestUtility {
         assertNoMoreRows(rs);
     }
 
-    private void checkTwoArgDoubleFunc(String func_name, String arg_0, String arg_1, String expected) throws SQLException {
-        String sql = "SELECT atan2(2, 2) AS result";
+    private void checkTwoArgDoubleFunc(String func_name, String col_name, boolean is_null, Double expected) throws SQLException {
+        String sql = String.format("SELECT %s(%s, %s) AS result FROM data WHERE is_null = %s",
+                                           func_name, col_name, col_name, (is_null ? 1 : 0));
 
         Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql);
         boolean exists = rs.next();
         assert(exists);
-
-//         checkStringRow(rs, new String[]{"result"}, new String[]{expected});
-//         assertNoMoreRows(rs);
+        if (is_null) {
+            checkDoubleRow(rs, new String[]{"result"}, new Double[]{null});
+        } else {
+            checkDoubleRow(rs, new String[]{"result"}, new Double[]{expected});
+        }
+        assertNoMoreRows(rs);
     }
      
     /**
@@ -163,7 +167,7 @@ public class FunctionsTest extends TestUtility {
     }
     @Test
     public void testPow() throws SQLException {
-        checkTwoArgDoubleFunc("pow", "42", "3.5", "480145.116864");
+        checkTwoArgDoubleFunc("pow", "double_val", false, 2.9297399331911957E13);
     }
     
     /**
