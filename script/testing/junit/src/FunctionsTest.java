@@ -168,6 +168,13 @@ public class FunctionsTest extends TestUtility {
     @Test
     public void testPow() throws SQLException {
         checkTwoArgDoubleFunc("pow", "double_val", false, 2.9297399331911957E13);
+        checkTwoArgDoubleFunc("pow", "double_val", true, null);
+    }
+
+    @Test
+    public void testAtan2() throws SQLException {
+        checkTwoArgDoubleFunc("atan2", "double_val", false, 0.785398);
+        checkTwoArgDoubleFunc("atan2", "double_val", true, null);
     }
     
     /**
