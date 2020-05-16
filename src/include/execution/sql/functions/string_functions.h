@@ -122,6 +122,11 @@ class EXPORT StringFunctions {
    * Converts the string to upper case
    */
   static void Upper(exec::ExecutionContext *ctx, StringVal *result, const StringVal &str);
+
+  /**
+   * Perform a trim of blank spaces on both sides
+   */
+  static void Md5Sum(exec::ExecutionContext *ctx, StringVal *result, const StringVal &str);
 };
 
 }  // namespace terrier::execution::sql

@@ -4,6 +4,9 @@
 
 #include "execution/exec/execution_context.h"
 #include "execution/util/bit_util.h"
+#include <iostream>
+#include <iomanip>
+#include <md5/md5.h>
 
 namespace terrier::execution::sql {
 
@@ -361,6 +364,37 @@ void StringFunctions::Right(UNUSED_ATTRIBUTE exec::ExecutionContext *ctx, String
   } else {
     *result = StringVal(str.Content() + len, str.len_ - len);
   }
+}
+
+void Md5Sum(exec::ExecutionContext* ctx, StringVal* result, const StringVal& str) {
+  if (str.is_null_) {
+    *result = StringVal::Null();
+    return;
+  }
+
+  const char *BYTES = str.Content();
+
+  md5::md5_t md5;
+  md5.process(BYTES, str.len_);
+  md5.finish();
+
+  // char str[MD5_STRING_SIZE];
+  char *ptr = StringVal::PreAllocate(result, ctx->GetStringAllocator(), MD5_STRING_SIZE);
+  md5.get_string(ptr);
+  //unsigned char md5sum[MD5_DIGEST_LENGTH];
+  //// boost::iostreams::mapped_file_source src(path);
+  //MD5(reinterpret_cast<const unsigned char*>(str.Content()), str.len_, md5sum);
+
+  //std::ostringstream sout;
+  //sout << std::hex << std::setfill('0');
+  //for (auto c : md5sum) sout << std::setw(2) << (int)c;
+  //auto src = sout.str();
+  //char *ptr = StringVal::PreAllocate(result, ctx->GetStringAllocator(), src.size());
+  //auto source = sout.str().c_str();
+  //for (uint32_t i = 0; i < src.size(); i++) {
+  //  ptr[i] = static_cast<char>(source[i]);
+  //}
+  //std::cout << result << std::endl;
 }
 
 }  // namespace terrier::execution::sql
