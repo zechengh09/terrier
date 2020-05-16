@@ -1783,6 +1783,11 @@ void DatabaseCatalog::BootstrapProcs(const common::ManagedPointer<transaction::T
   CreateProcedure(txn, postgres::LOWER_PRO_OID, "lower", postgres::INTERNAL_LANGUAGE_OID,
                   postgres::NAMESPACE_DEFAULT_NAMESPACE_OID, {"str"}, {str_type}, {str_type}, {}, str_type, "", true);
 
+  // pow
+  CreateProcedure(txn, postgres::POW_PRO_OID, "pow", postgres::INTERNAL_LANGUAGE_OID,
+                  postgres::NAMESPACE_DEFAULT_NAMESPACE_OID, {"y", "x"}, {dec_type, dec_type}, {dec_type, dec_type}, {},
+                  dec_type, "", true);
+
   // TODO(tanujnay112): no op codes for lower and upper yet
 
   BootstrapProcContexts(txn);
@@ -1826,6 +1831,12 @@ void DatabaseCatalog::BootstrapProcContexts(const common::ManagedPointer<transac
                                                            execution::ast::Builtin::Lower, true);
   SetProcCtxPtr(txn, postgres::LOWER_PRO_OID, func_context);
   txn->RegisterAbortAction([=]() { delete func_context; });
+
+  // pow
+  func_context = new execution::functions::FunctionContext("pow", type::TypeId::DECIMAL, {type::TypeId::DECIMAL},
+                                                                execution::ast::Builtin::Pow);
+  txn->RegisterAbortAction([=]() { delete func_context; });
+  SetProcCtxPtr(txn, postgres::POW_PRO_OID, func_context);
 }
 
 bool DatabaseCatalog::SetProcCtxPtr(common::ManagedPointer<transaction::TransactionContext> txn, proc_oid_t proc_oid,

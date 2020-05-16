@@ -152,6 +152,9 @@ namespace terrier::execution::ast {
   F(Sin, sin)                                                           \
   F(Tan, tan)                                                           \
                                                                         \
+  /* Arithmetic */                                                      \
+  F(Pow, pow)                                                           \
+                                                                        \
   /* Generic */                                                         \
   F(SizeOf, sizeOf)                                                     \
   F(PtrCast, ptrCast)                                                   \

@@ -129,6 +129,18 @@ public class FunctionsTest extends TestUtility {
         }
         assertNoMoreRows(rs);
     }
+
+    private void checkTwoArgDoubleFunc(String func_name, String arg_0, String arg_1, String expected) throws SQLException {
+        String sql = "SELECT atan2(2, 2) AS result";
+
+        Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(sql);
+        boolean exists = rs.next();
+        assert(exists);
+
+//         checkStringRow(rs, new String[]{"result"}, new String[]{expected});
+//         assertNoMoreRows(rs);
+    }
      
     /**
      * Tests usage of trig udf functions
@@ -148,6 +160,10 @@ public class FunctionsTest extends TestUtility {
     public void testTan() throws SQLException {
         checkDoubleFunc("tan", "double_val", false, -0.230318);
         checkDoubleFunc("tan", "double_val", true, null);
+    }
+    @Test
+    public void testPow() throws SQLException {
+        checkTwoArgDoubleFunc("pow", "42", "3.5", "480145.116864");
     }
     
     /**
