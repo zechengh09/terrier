@@ -186,7 +186,7 @@ public class FunctionsTest extends TestUtility {
         checkStringFunc("lower", "str_a_val", true, null);
     }
 
-        /**
+     /**
      * String Functions
      */
     @Test
