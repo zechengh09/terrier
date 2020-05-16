@@ -2603,7 +2603,8 @@ void Sema::CheckBuiltinCall(ast::CallExpr *call) {
       CheckBuiltinParamCall(call, builtin);
       break;
     }
-    case ast::Builtin::Lower: {
+    case ast::Builtin::Lower:
+    case ast::Builtin::InitCap: {
       CheckBuiltinStringCall(call, builtin);
       break;
     }

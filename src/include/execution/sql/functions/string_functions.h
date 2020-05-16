@@ -122,6 +122,11 @@ class EXPORT StringFunctions {
    * Converts the string to upper case
    */
   static void Upper(exec::ExecutionContext *ctx, StringVal *result, const StringVal &str);
+
+  /**
+   * Converts the first letter of each word to uppercase
+   */
+  static void InitCap(exec::ExecutionContext *ctx, StringVal *result, const StringVal &str);
 };
 
 }  // namespace terrier::execution::sql
