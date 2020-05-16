@@ -2350,7 +2350,8 @@ void BytecodeGenerator::VisitBuiltinCallExpr(ast::CallExpr *call) {
       break;
     }
 
-    case ast::Builtin::Lower: {
+    case ast::Builtin::Lower:
+    case ast::Builtin::InitCap: {
       VisitBuiltinStringCall(call, builtin);
       break;
     }

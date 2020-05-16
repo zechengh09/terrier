@@ -2228,7 +2228,8 @@ void Sema::CheckBuiltinParamCall(ast::CallExpr *call, ast::Builtin builtin) {
 void Sema::CheckBuiltinStringCall(ast::CallExpr *call, ast::Builtin builtin) {
   ast::BuiltinType::Kind sql_type;
   switch (builtin) {
-    case ast::Builtin::Lower: {
+    case ast::Builtin::Lower:
+    case ast::Builtin::InitCap: {
       // check to make sure this function has two arguments
       if (!CheckArgCount(call, 2)) {
         return;
