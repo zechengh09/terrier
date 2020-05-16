@@ -150,7 +150,7 @@ public class FunctionsTest extends TestUtility {
                                           boolean is_null, String expected) throws SQLException {
         String sql = String.format("SELECT %s(%s, \'%s\', %d) AS result FROM data WHERE is_null = %s",
                                            func_name, col_name, delimiter, field, (is_null ? 1 : 0));
-
+        System.out.println(sql);
         Statement stmt = conn.createStatement();
         ResultSet rs = stmt.executeQuery(sql);
         boolean exists = rs.next();
@@ -206,6 +206,7 @@ public class FunctionsTest extends TestUtility {
     @Test
     public void testSplitPart() throws SQLException {
         checkSplitPartStringFunc("split_part", "str_a_val", "d", 1, false, "AbC");
+        checkSplitPartStringFunc("split_part", "str_a_val", "d", 1, true, null);
     }
 
 }
