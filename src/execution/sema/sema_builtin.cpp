@@ -2276,8 +2276,6 @@ void Sema::CheckBuiltinStringCall(ast::CallExpr *call, ast::Builtin builtin) {
       // this function returns a string
       sql_type = ast::BuiltinType::StringVal;
       break;
-
-
     }
     case ast::Builtin::Lower:
     case ast::Builtin::InitCap: {
