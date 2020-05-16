@@ -184,7 +184,7 @@ public class FunctionsTest extends TestUtility {
      */
     @Test
     public void testMd5() throws SQLException {
-        checkStringFunc("md5", "str_a_val", false, "90469EB9B9CCAA40FA9C7D0C593A7201");
+        checkStringFunc("md5", "str_a_val", false, "90469eb9b9ccaa40fa9c7d0c593a7201");
         checkStringFunc("md5", "str_a_val", true, null);
     }
 }
