@@ -145,6 +145,23 @@ public class FunctionsTest extends TestUtility {
         }
         assertNoMoreRows(rs);
     }
+
+    private void checkSplitPartStringFunc(String func_name, String col_name, String delimiter, int field,
+                                          boolean is_null, String expected) throws SQLException {
+        String sql = String.format("SELECT %s(%s, \'%s\', %d) AS result FROM data WHERE is_null = %s",
+                                           func_name, col_name, delimiter, field, (is_null ? 1 : 0));
+
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery(sql);
+        boolean exists = rs.next();
+        assert(exists);
+        if (is_null) {
+            checkStringRow(rs, new String[]{"result"}, new String[]{null});
+        } else {
+            checkStringRow(rs, new String[]{"result"}, new String[]{expected});
+        }
+        assertNoMoreRows(rs);
+    }
      
     /**
      * Tests usage of trig udf functions
@@ -184,6 +201,11 @@ public class FunctionsTest extends TestUtility {
     public void testLower() throws SQLException {
         checkStringFunc("lower", "str_a_val", false, "abcdef");
         checkStringFunc("lower", "str_a_val", true, null);
+    }
+
+    @Test
+    public void testSplitPart() throws SQLException {
+        checkSplitPartStringFunc("split_part", "str_a_val", "d", 1, false, "AbC");
     }
 
 }
