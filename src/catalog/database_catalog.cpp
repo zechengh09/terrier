@@ -1836,6 +1836,12 @@ void DatabaseCatalog::BootstrapProcContexts(const common::ManagedPointer<transac
   SetProcCtxPtr(txn, postgres::LOWER_PRO_OID, func_context);
   txn->RegisterAbortAction([=]() { delete func_context; });
 
+  // initcap
+  func_context = new execution::functions::FunctionContext("initcap", type::TypeId::VARCHAR, {type::TypeId::VARCHAR},
+                                                           execution::ast::Builtin::InitCap, true);
+  SetProcCtxPtr(txn, postgres::INITCAP_PRO_OID, func_context);
+  txn->RegisterAbortAction([=]() { delete func_context; });
+
   // pow
   func_context = new execution::functions::FunctionContext("pow", type::TypeId::DECIMAL, {type::TypeId::DECIMAL},
                                                                 execution::ast::Builtin::Pow);
