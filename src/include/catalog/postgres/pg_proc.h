@@ -82,6 +82,6 @@ constexpr proc_oid_t UPPER_PRO_OID = proc_oid_t(93);
 
 constexpr proc_oid_t POW_PRO_OID = proc_oid_t(94);
 constexpr proc_oid_t MD5_PRO_OID = proc_oid_t(103);
-
 constexpr proc_oid_t INITCAP_PRO_OID = proc_oid_t(102);
+constexpr proc_oid_t SPLIT_PART_PRO_OID = proc_oid_t(122);
 }  // namespace terrier::catalog::postgres
