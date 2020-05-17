@@ -1787,6 +1787,10 @@ void DatabaseCatalog::BootstrapProcs(const common::ManagedPointer<transaction::T
   CreateProcedure(txn, postgres::MD5_PRO_OID, "md5", postgres::INTERNAL_LANGUAGE_OID,
                   postgres::NAMESPACE_DEFAULT_NAMESPACE_OID, {"str"}, {str_type}, {str_type}, {}, str_type, "", true);
 
+  // initCap
+  CreateProcedure(txn, postgres::INITCAP_PRO_OID, "initcap", postgres::INTERNAL_LANGUAGE_OID,
+                  postgres::NAMESPACE_DEFAULT_NAMESPACE_OID, {"str"}, {str_type}, {str_type}, {}, str_type, "", true);
+
   // pow
   CreateProcedure(txn, postgres::POW_PRO_OID, "pow", postgres::INTERNAL_LANGUAGE_OID,
                   postgres::NAMESPACE_DEFAULT_NAMESPACE_OID, {"y", "x"}, {dec_type, dec_type}, {dec_type, dec_type}, {},
@@ -1840,6 +1844,12 @@ void DatabaseCatalog::BootstrapProcContexts(const common::ManagedPointer<transac
   func_context = new execution::functions::FunctionContext("md5", type::TypeId::VARCHAR, {type::TypeId::VARCHAR},
                                                            execution::ast::Builtin::Md5Sum, true);
   SetProcCtxPtr(txn, postgres::MD5_PRO_OID, func_context);
+  txn->RegisterAbortAction([=]() { delete func_context; });
+
+  // initcap
+  func_context = new execution::functions::FunctionContext("initcap", type::TypeId::VARCHAR, {type::TypeId::VARCHAR},
+                                                           execution::ast::Builtin::InitCap, true);
+  SetProcCtxPtr(txn, postgres::INITCAP_PRO_OID, func_context);
   txn->RegisterAbortAction([=]() { delete func_context; });
 
   // pow

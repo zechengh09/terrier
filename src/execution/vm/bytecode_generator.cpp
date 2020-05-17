@@ -2059,6 +2059,11 @@ void BytecodeGenerator::VisitBuiltinStringCall(ast::CallExpr *call, ast::Builtin
       Emitter()->Emit(Bytecode::Md5Sum, exec_ctx, ret, input_string);
       break;
     }
+    case ast::Builtin::InitCap:
+    {
+      Emitter()->Emit(Bytecode::InitCap, exec_ctx, ret, input_string);
+      break;
+    }
     default:
       UNREACHABLE("Unimplemented string function!");
   }
@@ -2348,11 +2353,9 @@ void BytecodeGenerator::VisitBuiltinCallExpr(ast::CallExpr *call) {
       break;
     }
 
-    case ast::Builtin::Lower: {
-      VisitBuiltinStringCall(call, builtin);
-      break;
-    }
-    case ast::Builtin::Md5Sum: {
+    case ast::Builtin::Lower:
+    case ast::Builtin::Md5Sum:
+    case ast::Builtin::InitCap: {
       VisitBuiltinStringCall(call, builtin);
       break;
     }

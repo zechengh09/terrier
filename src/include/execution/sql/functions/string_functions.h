@@ -127,6 +127,11 @@ class EXPORT StringFunctions {
    * Perform a trim of blank spaces on both sides
    */
   static void Md5Sum(exec::ExecutionContext *ctx, StringVal *result, const StringVal &str);
+
+  /**
+   * Converts the first letter of each word to uppercase
+   */
+  static void InitCap(exec::ExecutionContext *ctx, StringVal *result, const StringVal &str);
 };
 
 }  // namespace terrier::execution::sql

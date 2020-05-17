@@ -390,4 +390,30 @@ void StringFunctions::Md5Sum(exec::ExecutionContext *ctx, StringVal *result, con
   }
 }
 
+void StringFunctions::InitCap(exec::ExecutionContext *ctx, StringVal *result, const StringVal &str) {
+  if (str.is_null_) {
+    *result = StringVal::Null();
+    return;
+  }
+
+  if (str.len_ == 0) {
+    *result = str;
+    return;
+  }
+
+  char *ptr = StringVal::PreAllocate(result, ctx->GetStringAllocator(), str.len_);
+  if (UNLIKELY(ptr == nullptr)) {
+    // Allocation failed
+    return;
+  }
+
+  auto *src = str.Content();
+  bool upper = !isalnum(src[0]);
+  ptr[0] = static_cast<char>(std::toupper(src[0]));
+  for (uint32_t i = 1; i < str.len_; i++) {
+    ptr[i] = upper ? static_cast<char>(std::toupper(src[i])) : src[i];
+    upper = !isalnum(src[i]);
+  }
+}
+
 }  // namespace terrier::execution::sql

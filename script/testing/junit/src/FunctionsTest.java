@@ -185,6 +185,11 @@ public class FunctionsTest extends TestUtility {
         checkStringFunc("lower", "str_a_val", false, "abcdef");
         checkStringFunc("lower", "str_a_val", true, null);
     }
+    @Test
+    public void testInitCap() throws SQLException {
+        checkStringFunc("initcap", "str_a_val", false, "AbCdEf");
+        checkStringFunc("initcap", "str_a_val", true, null);
+    }
 
      /**
      * String Functions

@@ -248,7 +248,8 @@ namespace terrier::execution::ast {
                                                                         \
   /* String functions */                                                \
   F(Lower, lower)                                                       \
-  F(Md5Sum, md5)
+  F(Md5Sum, md5)                                                        \
+   F(InitCap, initCap)                                                  \
 
 /**
  * Enum of builtins
